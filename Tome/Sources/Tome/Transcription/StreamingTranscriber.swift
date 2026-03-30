@@ -2,15 +2,17 @@
 import FluidAudio
 import os
 
-// VAD + ASR pipeline
+// VAD + ASR pipeline — supports Parakeet (auto-detect) and Qwen3 (forced language)
 final class StreamingTranscriber: @unchecked Sendable {
-    private let asrManager: AsrManager
+    private let asrManager: AsrManager?
+    private let qwen3AsrManager: Qwen3AsrManager?
+    private let qwen3Language: String
     private let vadManager: VadManager
     private let speaker: Speaker
     private let audioSource: AudioSource
     private let onPartial: @Sendable (String) -> Void
     private let onFinal: @Sendable (String) -> Void
-    private let log = Logger(subsystem: "io.gremble.tome", category: "StreamingTranscriber")
+    private let log = Logger(subsystem: "co.gecofiin.tome", category: "StreamingTranscriber")
 
     /// Resampler from source format to 16kHz mono Float32.
     private var converter: AVAudioConverter?
@@ -22,7 +24,9 @@ final class StreamingTranscriber: @unchecked Sendable {
     )!
 
     init(
-        asrManager: AsrManager,
+        asrManager: AsrManager? = nil,
+        qwen3AsrManager: Qwen3AsrManager? = nil,
+        qwen3Language: String = "es",
         vadManager: VadManager,
         speaker: Speaker,
         audioSource: AudioSource = .microphone,
@@ -30,6 +34,8 @@ final class StreamingTranscriber: @unchecked Sendable {
         onFinal: @escaping @Sendable (String) -> Void
     ) {
         self.asrManager = asrManager
+        self.qwen3AsrManager = qwen3AsrManager
+        self.qwen3Language = qwen3Language
         self.vadManager = vadManager
         self.speaker = speaker
         self.audioSource = audioSource
@@ -143,8 +149,20 @@ final class StreamingTranscriber: @unchecked Sendable {
     /// Returns `true` on success, `false` on ASR error.
     private func transcribeSegment(_ samples: [Float]) async -> Bool {
         do {
-            let result = try await asrManager.transcribe(samples, source: audioSource)
-            let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let text: String
+            if let qwen3 = qwen3AsrManager {
+                // Qwen3 — forced language transcription
+                let lang = Qwen3AsrConfig.Language(from: qwen3Language)
+                let result = try await qwen3.transcribe(audioSamples: samples, language: lang)
+                text = result.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if let parakeet = asrManager {
+                // Parakeet — auto-detect language
+                let result = try await parakeet.transcribe(samples, source: audioSource)
+                text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                log.error("No ASR engine available")
+                return false
+            }
             guard !text.isEmpty else { return true }
             log.info("[\(self.speaker.rawValue)] transcribed: \(text.prefix(80))")
             onFinal(text)

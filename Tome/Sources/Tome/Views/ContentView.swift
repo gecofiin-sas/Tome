@@ -301,12 +301,16 @@ struct ContentView: View {
                 await transcriptionEngine?.start(
                     locale: settings.locale,
                     inputDeviceID: settings.inputDeviceID,
-                    appBundleID: appBundleID
+                    appBundleID: appBundleID,
+                    engine: settings.asrEngine,
+                    languageCode: settings.transcriptionLanguage
                 )
             } else {
                 await transcriptionEngine?.start(
                     locale: settings.locale,
-                    inputDeviceID: settings.inputDeviceID
+                    inputDeviceID: settings.inputDeviceID,
+                    engine: settings.asrEngine,
+                    languageCode: settings.transcriptionLanguage
                 )
             }
         }
