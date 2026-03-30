@@ -8,7 +8,7 @@ struct OnboardingView: View {
         (
             "waveform.circle",
             "Welcome to Tome",
-            "A lightweight meeting transcription tool that captures your conversations — all running locally on your Mac. No API keys, no cloud services."
+            "A lightweight meeting transcription tool that captures your conversations — all running locally on your Mac. No API keys required. On first run, AI models are downloaded (~500MB). After that, no audio or text ever leaves your device."
         ),
         (
             "text.quote",

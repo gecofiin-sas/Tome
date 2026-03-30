@@ -77,6 +77,10 @@ final class SystemAudioCapture: NSObject, @unchecked Sendable, SCStreamDelegate,
         _sysContinuation.withLock { $0?.finish(); $0 = nil }
         _audioFileWriter.withLock { $0 = nil } // closes the file
         _audioLevel.value = 0
+        // GECOFIIN FIX: always clean up the WAV buffer on stop to prevent
+        // orphaned audio files on disk after crashes or force-quits.
+        // The original code only cleaned up after successful diarization.
+        cleanupBufferFile()
     }
 
     /// Remove the buffered audio file after diarization is complete

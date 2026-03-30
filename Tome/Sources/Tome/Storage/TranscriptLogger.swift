@@ -211,10 +211,13 @@ tags:
 
         // Update lastSessionFilePath if the file was renamed
         if !lastSessionContext.isEmpty {
-            let truncated = String(lastSessionContext.prefix(50))
-                .replacingOccurrences(of: "/", with: "-")
-                .replacingOccurrences(of: ":", with: "-")
-                .trimmingCharacters(in: .whitespaces)
+            // GECOFIIN FIX: sanitize context string aggressively to prevent
+            // path traversal (e.g. "../../.ssh/authorized_keys" as context)
+            let sanitized = String(lastSessionContext.prefix(50))
+                .components(separatedBy: CharacterSet.alphanumerics
+                    .union(.init(charactersIn: " ()-")).inverted)
+                .joined(separator: "-")
+            let truncated = sanitized.trimmingCharacters(in: .whitespaces)
             let dateFmt = DateFormatter()
             dateFmt.dateFormat = "yyyy-MM-dd HH-mm-ss"
             let datePrefix = dateFmt.string(from: startTime)

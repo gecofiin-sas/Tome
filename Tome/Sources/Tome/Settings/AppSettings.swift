@@ -38,10 +38,10 @@ final class AppSettings {
 
     init() {
         let defaults = UserDefaults.standard
-        self.transcriptionLocale = defaults.string(forKey: "transcriptionLocale") ?? "en-US"
+        self.transcriptionLocale = defaults.string(forKey: "transcriptionLocale") ?? "es-CO"
         self.inputDeviceID = AudioDeviceID(defaults.integer(forKey: "inputDeviceID"))
-        self.vaultMeetingsPath = defaults.string(forKey: "vaultMeetingsPath") ?? NSString("~/Documents/Tome/Meetings").expandingTildeInPath
-        self.vaultVoicePath = defaults.string(forKey: "vaultVoicePath") ?? NSString("~/Documents/Tome/Voice").expandingTildeInPath
+        self.vaultMeetingsPath = defaults.string(forKey: "vaultMeetingsPath") ?? NSString("~/Library/CloudStorage/OneDrive-gecofiin/TRANSCRIPCIONES/Inbox").expandingTildeInPath
+        self.vaultVoicePath = defaults.string(forKey: "vaultVoicePath") ?? NSString("~/Library/CloudStorage/OneDrive-gecofiin/TRANSCRIPCIONES/Voice").expandingTildeInPath
         // Default to true (hidden) if key has never been set
         if defaults.object(forKey: "hideFromScreenShare") == nil {
             self.hideFromScreenShare = true

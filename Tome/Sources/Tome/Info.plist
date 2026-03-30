@@ -7,7 +7,7 @@
     <key>CFBundleDisplayName</key>
     <string>Tome</string>
     <key>CFBundleIdentifier</key>
-    <string>io.gremble.tome</string>
+    <string>co.gecofiin.tome</string>
     <key>CFBundleVersion</key>
     <string>1.1.0</string>
     <key>CFBundleShortVersionString</key>
@@ -26,10 +26,13 @@
     <string>Tome needs screen capture permission to capture system audio from other participants.</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
+    <!-- GECOFIIN: Auto-updates disabled until we set up our own appcast.
+         The original SUFeedURL pointed to Gremble-io's GitHub, which would
+         install third-party updates on GECOFIIN employee machines. -->
     <key>SUFeedURL</key>
-    <string>https://raw.githubusercontent.com/Gremble-io/Tome/gh-pages/appcast.xml</string>
+    <string>https://raw.githubusercontent.com/gecofiin-sas/Tome/gh-pages/appcast.xml</string>
     <key>SUEnableAutomaticChecks</key>
-    <true/>
+    <false/>
     <key>SUPublicEDKey</key>
     <string>LT2/oCSuJPmnri+6b62DV1WhHxSmWrJ1nZzbAK2ipV4=</string>
 </dict>

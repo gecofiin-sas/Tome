@@ -41,6 +41,15 @@ actor SessionStore {
     func endSession() {
         try? fileHandle?.close()
         fileHandle = nil
+        // GECOFIIN FIX: delete the JSONL session file after closing.
+        // The vault markdown is the canonical output — the JSONL is only
+        // needed as a crash-recovery buffer during the active session.
+        // Without this, JSONL files accumulate indefinitely in
+        // ~/Library/Application Support/Tome/sessions/ containing full
+        // transcripts of every meeting ever recorded.
+        if let file = currentFile {
+            try? FileManager.default.removeItem(at: file)
+        }
         currentFile = nil
     }
 
