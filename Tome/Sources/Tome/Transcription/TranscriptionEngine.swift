@@ -39,9 +39,15 @@ final class TranscriptionEngine {
     /// Keeps the mic stream alive for the audio level meter when transcription isn't running.
     private var micKeepAliveTask: Task<Void, Never>?
 
-    /// Shared FluidAudio instances
+    /// Shared FluidAudio instances — Parakeet (auto-detect)
     private var asrManager: AsrManager?
     private var vadManager: VadManager?
+
+    /// Qwen3 ASR manager — forced language transcription
+    private var qwen3AsrManager: Qwen3AsrManager?
+
+    /// Which ASR engine is active this session
+    private var activeEngine: AsrEngine = .parakeet
 
     /// Tracks the resolved mic device ID currently in use.
     private var currentMicDeviceID: AudioDeviceID = 0
@@ -56,42 +62,73 @@ final class TranscriptionEngine {
         self.transcriptStore = transcriptStore
     }
 
-    func start(locale: Locale, inputDeviceID: AudioDeviceID = 0, appBundleID: String? = nil) async {
-        diagLog("[ENGINE-0] start() called, isRunning=\(isRunning)")
+    func start(locale: Locale, inputDeviceID: AudioDeviceID = 0, appBundleID: String? = nil, engine: AsrEngine = .parakeet, languageCode: String = "es") async {
+        diagLog("[ENGINE-0] start() called, isRunning=\(isRunning), engine=\(engine.rawValue)")
         guard !isRunning else { return }
         lastError = nil
 
         guard await ensureMicrophonePermission() else { return }
 
         isRunning = true
+        activeEngine = engine
 
         // 1. Load FluidAudio models
-        assetStatus = "Downloading multilingual model (first run)..."
-        diagLog("[ENGINE-1] loading FluidAudio ASR models...")
-        do {
-            let models = try await AsrModels.downloadAndLoad(version: .v3)
-            assetStatus = "Initializing ASR..."
-            let asr = AsrManager(config: .default)
-            try await asr.loadModels(models)
-            self.asrManager = asr
+        if engine == .qwen3 {
+            assetStatus = "Descargando modelo Qwen3 (primera vez, ~1.7GB)..."
+            diagLog("[ENGINE-1] loading Qwen3 ASR models...")
+            do {
+                let modelsDir = try await Qwen3AsrModels.download(variant: .int8)
+                assetStatus = "Inicializando ASR (Qwen3)..."
+                let qwen3 = Qwen3AsrManager()
+                try await qwen3.loadModels(from: modelsDir)
+                self.qwen3AsrManager = qwen3
 
-            assetStatus = "Loading VAD model..."
-            diagLog("[ENGINE-1b] loading VAD model...")
-            let vad = try await VadManager()
-            self.vadManager = vad
+                assetStatus = "Cargando modelo VAD..."
+                diagLog("[ENGINE-1b] loading VAD model...")
+                let vad = try await VadManager()
+                self.vadManager = vad
 
-            assetStatus = "Models ready"
-            diagLog("[ENGINE-2] FluidAudio models loaded")
-        } catch {
-            let msg = "Failed to load models: \(error.localizedDescription)"
-            diagLog("[ENGINE-2-FAIL] \(msg)")
-            lastError = msg
-            assetStatus = "Ready"
-            isRunning = false
-            return
+                assetStatus = "Modelos listos"
+                diagLog("[ENGINE-2] Qwen3 + VAD models loaded")
+            } catch {
+                let msg = "Error al cargar modelos: \(error.localizedDescription)"
+                diagLog("[ENGINE-2-FAIL] \(msg)")
+                lastError = msg
+                assetStatus = "Ready"
+                isRunning = false
+                return
+            }
+        } else {
+            assetStatus = "Downloading multilingual model (first run)..."
+            diagLog("[ENGINE-1] loading FluidAudio ASR models...")
+            do {
+                let models = try await AsrModels.downloadAndLoad(version: .v3)
+                assetStatus = "Initializing ASR..."
+                let asr = AsrManager(config: .default)
+                try await asr.loadModels(models)
+                self.asrManager = asr
+
+                assetStatus = "Loading VAD model..."
+                diagLog("[ENGINE-1b] loading VAD model...")
+                let vad = try await VadManager()
+                self.vadManager = vad
+
+                assetStatus = "Models ready"
+                diagLog("[ENGINE-2] FluidAudio models loaded")
+            } catch {
+                let msg = "Failed to load models: \(error.localizedDescription)"
+                diagLog("[ENGINE-2-FAIL] \(msg)")
+                lastError = msg
+                assetStatus = "Ready"
+                isRunning = false
+                return
+            }
         }
 
-        guard let asrManager, let vadManager else { return }
+        guard let vadManager else { return }
+        // For Parakeet, asrManager must exist; for Qwen3, qwen3AsrManager must exist
+        if engine == .parakeet && asrManager == nil { return }
+        if engine == .qwen3 && qwen3AsrManager == nil { return }
 
         // 2. Start mic capture
         userSelectedDeviceID = inputDeviceID
@@ -116,7 +153,9 @@ final class TranscriptionEngine {
         // 4. Start mic transcription
         let store = transcriptStore
         let micTranscriber = StreamingTranscriber(
-            asrManager: asrManager,
+            asrManager: engine == .parakeet ? asrManager : nil,
+            qwen3AsrManager: engine == .qwen3 ? qwen3AsrManager : nil,
+            qwen3Language: languageCode,
             vadManager: vadManager,
             speaker: .you,
             audioSource: .microphone,
@@ -143,7 +182,9 @@ final class TranscriptionEngine {
         // 5. Start system audio transcription
         if let sysStream = sysStreams?.systemAudio {
             let sysTranscriber = StreamingTranscriber(
-                asrManager: asrManager,
+                asrManager: engine == .parakeet ? asrManager : nil,
+                qwen3AsrManager: engine == .qwen3 ? qwen3AsrManager : nil,
+                qwen3Language: languageCode,
                 vadManager: vadManager,
                 speaker: .them,
                 audioSource: .system,
@@ -168,7 +209,7 @@ final class TranscriptionEngine {
             }
         }
 
-        assetStatus = "Transcribing (Parakeet-TDT v3)"
+        assetStatus = engine == .qwen3 ? "Transcribiendo (Qwen3 — \(languageCode))" : "Transcribing (Parakeet-TDT v3)"
         diagLog("[ENGINE-6] all transcription tasks started")
 
         // Install CoreAudio listener for default input device changes
@@ -177,8 +218,10 @@ final class TranscriptionEngine {
 
     /// Restart only the mic capture with a new device, keeping system audio and models intact.
     /// Pass the raw setting value (0 = system default, or a specific AudioDeviceID).
-    func restartMic(inputDeviceID: AudioDeviceID) {
-        guard isRunning, let asrManager, let vadManager else { return }
+    func restartMic(inputDeviceID: AudioDeviceID, languageCode: String = "es") {
+        guard isRunning, let vadManager else { return }
+        // Need at least one ASR engine
+        guard asrManager != nil || qwen3AsrManager != nil else { return }
 
         // Only update user selection when explicitly changed (not from OS listener)
         if inputDeviceID != 0 || userSelectedDeviceID != 0 {
@@ -203,7 +246,9 @@ final class TranscriptionEngine {
         let micStream = micCapture.bufferStream(deviceID: targetMicID)
         let store = transcriptStore
         let micTranscriber = StreamingTranscriber(
-            asrManager: asrManager,
+            asrManager: activeEngine == .parakeet ? asrManager : nil,
+            qwen3AsrManager: activeEngine == .qwen3 ? qwen3AsrManager : nil,
+            qwen3Language: languageCode,
             vadManager: vadManager,
             speaker: .you,
             audioSource: .microphone,

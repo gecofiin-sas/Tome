@@ -51,6 +51,32 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Idioma / Language") {
+                Picker("Motor ASR", selection: $settings.asrEngine) {
+                    ForEach(AsrEngine.allCases, id: \.self) { engine in
+                        Text(engine.rawValue).tag(engine)
+                    }
+                }
+                .font(.system(size: 12))
+
+                if settings.asrEngine == .qwen3 {
+                    Picker("Idioma", selection: $settings.transcriptionLanguage) {
+                        ForEach(TranscriptionLanguage.all) { lang in
+                            Text(lang.name).tag(lang.id)
+                        }
+                    }
+                    .font(.system(size: 12))
+
+                    Text("Qwen3 fuerza la transcripción al idioma seleccionado. Ideal para reuniones donde todos hablan el mismo idioma.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Parakeet auto-detecta el idioma por segmento. Puede mezclar idiomas en la misma sesión.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Audio Input") {
                 Picker("Microphone", selection: $settings.inputDeviceID) {
                     Text("System Default").tag(AudioDeviceID(0))
