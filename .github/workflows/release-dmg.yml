@@ -135,11 +135,11 @@ jobs:
           echo "EdDSA signature: $ED_SIGNATURE"
           echo "DMG length: $DMG_LENGTH"
 
-          DMG_URL="https://github.com/Gremble-io/Tome/releases/download/${TAG}/Tome.dmg"
+          DMG_URL="https://github.com/gecofiin-sas/Tome/releases/download/${TAG}/Tome.dmg"
           PUB_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
 
           # Clone gh-pages branch
-          git clone --branch gh-pages --single-branch "https://x-access-token:${GH_TOKEN}@github.com/Gremble-io/Tome.git" /tmp/gh-pages
+          git clone --branch gh-pages --single-branch "https://x-access-token:${GH_TOKEN}@github.com/gecofiin-sas/Tome.git" /tmp/gh-pages
 
           # Generate appcast.xml
           cat > /tmp/gh-pages/appcast.xml <<APPCAST_EOF
@@ -147,7 +147,7 @@ jobs:
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
             <channel>
               <title>Tome Updates</title>
-              <link>https://raw.githubusercontent.com/Gremble-io/Tome/gh-pages/appcast.xml</link>
+              <link>https://raw.githubusercontent.com/gecofiin-sas/Tome/gh-pages/appcast.xml</link>
               <description>Most recent updates to Tome</description>
               <language>en</language>
               <item>
