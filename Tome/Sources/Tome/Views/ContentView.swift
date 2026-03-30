@@ -123,7 +123,7 @@ struct ContentView: View {
                 sessionElapsed += 1
                 if audioLevel < 0.01 {
                     silenceSeconds += 1
-                    if silenceSeconds >= 120 {
+                    if silenceSeconds >= 300 {
                         stopSession()
                     }
                 }
